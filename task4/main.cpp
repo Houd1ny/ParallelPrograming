@@ -16,6 +16,17 @@ struct Point
     friend ostream& operator<<(ostream& os, const Point& p);
 };
 
+struct PointAndDistance
+{
+    double disnace;
+    Point p1;
+    Point p2;
+    bool operator<(const PointAndDistance& pAndD) const
+    {
+        return this->disnace < pAndD.disnace;
+    }
+};
+
 ostream& operator<<(ostream& os, const Point& p)
 {
     os << "(" << p.x << ", " << p.y << ")";
@@ -38,46 +49,52 @@ void print(const std::vector<Point>& arr)
     cout << endl;
 }
 
-double bruteForce(Iter begin, Iter end)
+PointAndDistance bruteForce(Iter begin, Iter end)
 {
-    double min = numeric_limits<double>::max();
+    PointAndDistance midDist;
+    midDist.disnace = numeric_limits<double>::max();
     for (auto it_i= begin; it_i != end ; ++it_i)
     {
         for (auto it_j = it_i + 1; it_j != end; ++it_j)
         {
             double dist_i_j = dist(*it_i, *it_j);
-            if (dist_i_j < min)
+            if (dist_i_j < midDist.disnace)
             {
-                min = dist_i_j;
+                midDist.disnace = dist_i_j;
+                midDist.p1 = *it_i;
+                midDist.p2 = *it_j;
             }
         }
     }
-    return min;
+    return midDist;
 }
 
-double closest_pair_merge(Iter begin, Iter end, Iter mid, double d)
+PointAndDistance closest_pair_merge(Iter begin, Iter end, Iter mid, double d)
 {
     std::vector<Point> strip;
     copy_if(begin, end, back_inserter(strip), [=](const Point& p) {
         return std::abs(p.x - mid->x) < d;
     });
 
-    double min = numeric_limits<double>::max();
+    PointAndDistance midDist;
+    midDist.disnace = numeric_limits<double>::max();
     for (auto it_i = strip.begin(); it_i != strip.end() ; ++it_i)
     {
         for (auto it_j = it_i + 1;  it_j != it_i + 8 && it_j != strip.end(); ++it_j)
         {
             double dist_i_j = dist(*it_i, *it_j);
-            if (dist_i_j < min)
+            if (dist_i_j < midDist.disnace)
             {
-                min = dist_i_j;
+                midDist.disnace = dist_i_j;
+                midDist.p1 = *it_i;
+                midDist.p2 = *it_j;
             }
         }
     }
-    return min;
+    return midDist;
 }
 
-double closest_pair_rec(Iter beginPx, Iter endPx, Iter beginPy, Iter endPy, int depth)
+PointAndDistance closest_pair_rec(Iter beginPx, Iter endPx, Iter beginPy, Iter endPy, int depth)
 {
     size_t size = endPx - beginPx;
     if (size <= 3)
@@ -98,7 +115,7 @@ double closest_pair_rec(Iter beginPx, Iter endPx, Iter beginPy, Iter endPy, int 
          Pyr.push_back(*it);
     }
 
-    double d = 0;
+    PointAndDistance d;
     if (depth >= 0 )
     {
         auto dl = std::async(closest_pair_rec, beginPx, mid, Pyl.begin(), Pyl.end(), --depth);
@@ -109,16 +126,16 @@ double closest_pair_rec(Iter beginPx, Iter endPx, Iter beginPy, Iter endPy, int 
     else
     {
 
-        double dl = closest_pair_rec(beginPx, mid, Pyl.begin(), Pyl.end(), -1);
-        double dr = closest_pair_rec(mid, endPx, Pyr.begin(), Pyr.end(), -1);
+        auto dl = closest_pair_rec(beginPx, mid, Pyl.begin(), Pyl.end(), -1);
+        auto dr = closest_pair_rec(mid, endPx, Pyr.begin(), Pyr.end(), -1);
 
         d = std::min(dl, dr);
     }
 
-    return std::min(d, closest_pair_merge(beginPy, endPy, mid, d));
+    return std::min(d, closest_pair_merge(beginPy, endPy, mid, d.disnace));
 }
 
-double closest_pair(const std::vector<Point>& arr, int threads)
+PointAndDistance closest_pair(const std::vector<Point>& arr, int threads)
 {
     std::vector<Point> Px(arr.begin(), arr.end());
     std::vector<Point> Py(arr.begin(), arr.end());
@@ -140,26 +157,22 @@ int main()
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(1, 100000000);
+    std::uniform_real_distribution<> dis(1, 100000);
 
-    size_t size = std::pow (2, 3);
-
-    double d1 = 0;
-    double d2 = 0;
-
-    std::vector<Point> arr(100000);
+    std::vector<Point> arr(1000000);
     std::generate(arr.begin(), arr.end(), [&](){return Point{dis(gen), dis(gen)};});
 
 
     high_resolution_clock::time_point start = high_resolution_clock::now();
-    d1 = closest_pair(arr, 0);
+    auto d1 = closest_pair(arr, 0);
+    cout << "distance " << d1.disnace << "points " << d1.p1 << " " << d1.p2 << endl;
     high_resolution_clock::time_point end = high_resolution_clock::now();
 
     size_t milisecs_brute = duration_cast<milliseconds>( end - start ).count();
     cout << "bruteforce " << milisecs_brute << " milliseconds" << endl;
 
     start = high_resolution_clock::now();
-    d2 = closest_pair(arr, 4);
+    auto d2 = closest_pair(arr, 4);
     end = high_resolution_clock::now();
 
     size_t milisecs_smart = duration_cast<milliseconds>( end - start ).count();
